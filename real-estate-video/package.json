@@ -1,0 +1,19 @@
+{
+  "name": "real-estate-video",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "remotion preview src/index.tsx",
+    "build": "remotion render src/index.tsx",
+    "server": "remotion studio"
+  },
+  "dependencies": {
+    "@remotion/cli": "latest",
+    "@remotion/react": "latest",
+    "@remotion/player": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "framer-motion": "latest",
+    "remotion": "latest"
+  }
+}
