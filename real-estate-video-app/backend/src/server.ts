@@ -5,6 +5,9 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 
+// Security middleware
+import { securityHeaders, rateLimit } from './middleware/security';
+
 // Routes
 import scriptRoutes from './routes/script';
 import ttsRoutes from './routes/tts';
@@ -13,6 +16,9 @@ import videoRoutes from './routes/video';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Security headers
+app.use(securityHeaders);
 
 // Middleware
 app.use(cors({
@@ -28,26 +34,20 @@ app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 app.use('/renders', express.static(path.join(process.cwd(), 'renders')));
 app.use('/audio', express.static(path.join(process.cwd(), 'uploads', 'audio')));
 
-// Health check
+// Health check (non-revealing)
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    services: {
-      minimax: !!process.env.MINIMAX_API_KEY ? 'configured' : 'mock',
-      openai: !!process.env.OPENAI_API_KEY ? 'configured' : 'not_configured',
-      elevenlabs: !!process.env.ELEVENLABS_API_KEY ? 'configured' : 'not_configured',
-      supabase: !!process.env.SUPABASE_URL ? 'configured' : 'local_mode',
-      remotion: !!process.env.REMOTION_ENTRY ? 'configured' : 'mock',
-    },
+    version: '1.0.0',
   });
 });
 
-// API Routes
-app.use('/api/script', scriptRoutes);
-app.use('/api/tts', ttsRoutes);
-app.use('/api/upload', uploadRoutes);
-app.use('/api/video', videoRoutes);
+// API Routes with rate limiting
+app.use('/api/script', rateLimit(50, 15 * 60 * 1000), scriptRoutes);
+app.use('/api/tts', rateLimit(30, 15 * 60 * 1000), ttsRoutes);
+app.use('/api/upload', rateLimit(20, 15 * 60 * 1000), uploadRoutes);
+app.use('/api/video', rateLimit(10, 15 * 60 * 1000), videoRoutes);
 
 // Error handling
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

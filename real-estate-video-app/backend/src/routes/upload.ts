@@ -81,6 +81,14 @@ router.delete('/:path(*)', async (req, res) => {
   try {
     const storagePath = req.params.path;
     
+    // Prevent path traversal attacks
+    if (storagePath.includes('..') || storagePath.startsWith('/')) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid path',
+      });
+    }
+    
     await uploadService.deleteImage(storagePath);
 
     res.json({
@@ -104,6 +112,15 @@ router.delete('/:path(*)', async (req, res) => {
 router.get('/url/:path(*)', async (req, res) => {
   try {
     const storagePath = req.params.path;
+    
+    // Prevent path traversal attacks
+    if (storagePath.includes('..') || storagePath.startsWith('/')) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid path',
+      });
+    }
+    
     const url = await uploadService.getPublicUrl(storagePath);
 
     res.json({
