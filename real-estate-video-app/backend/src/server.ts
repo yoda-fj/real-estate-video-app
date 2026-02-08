@@ -1,6 +1,8 @@
+// Carrega variáveis de ambiente PRIMEIRO (antes de qualquer outro import)
+import './load-env';
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import path from 'path';
 
 // Routes
@@ -8,9 +10,6 @@ import scriptRoutes from './routes/script';
 import ttsRoutes from './routes/tts';
 import uploadRoutes from './routes/upload';
 import videoRoutes from './routes/video';
-
-// Load environment variables
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -24,9 +23,10 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Static files (uploads and renders)
+// Static files (uploads, renders and audio)
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 app.use('/renders', express.static(path.join(process.cwd(), 'renders')));
+app.use('/audio', express.static(path.join(process.cwd(), 'uploads', 'audio')));
 
 // Health check
 app.get('/health', (req, res) => {

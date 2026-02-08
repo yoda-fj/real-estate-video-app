@@ -1,37 +1,40 @@
 import React from 'react';
-import { Composition } from 'remotion';
-import { DynamicVideo } from './templates/DynamicVideo';
+import { Composition, calculateMetadata } from 'remotion';
+import { RealEstateVideo } from './templates/RealEstateVideo';
 
-// Root component for Remotion Studio
 export const RemotionRoot: React.FC = () => {
   return (
     <>
       <Composition
-        id="DynamicVideo"
-        component={DynamicVideo}
-        durationInFrames={900}
+        id="RealEstateVideo"
+        component={RealEstateVideo as any}
+        durationInFrames={300} // Aumentado para 10 segundos
         fps={30}
         width={1080}
         height={1920}
         defaultProps={{
-          images: [
-            { url: 'https://via.placeholder.com/1080x1920/667eea/ffffff?text=Image+1', duration: 3000 },
-            { url: 'https://via.placeholder.com/1080x1920/764ba2/ffffff?text=Image+2', duration: 3000 },
-          ],
-          captions: [
-            { text: 'Bem-vindo ao seu novo lar', startTime: 0, endTime: 3000 },
-            { text: 'Ambiente moderno e aconchegante', startTime: 3000, endTime: 6000 },
-          ],
-          musicUrl: '/musics/fun-upbeat-energetic-pop-rock-345251.mp3',
-          style: {
-            font: 'Inter',
-            fontSize: 48,
-            color: '#FFFFFF',
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            position: 'bottom',
-            animation: 'fade',
-            transition: 'fade',
-          },
+          images: ['https://via.placeholder.com/1080x1920'],
+          title: '',
+          captions: [],
+        }}
+        calculateMetadata={({ props }) => {
+          // Calcular duração baseado nas captions
+          const captions = props.captions || [];
+          let maxTime = 3; // Mínimo 3 segundos
+          
+          captions.forEach((cap: any) => {
+            const endTime = (cap.startTime || 0) + (cap.duration || 0);
+            if (endTime > maxTime) maxTime = endTime;
+          });
+          
+          // Adicionar 1 segundo de margem
+          const durationInFrames = Math.ceil((maxTime + 1) * 30);
+          
+          console.log('📊 Duração calculada:', durationInFrames, 'frames');
+          
+          return {
+            durationInFrames,
+          };
         }}
       />
     </>

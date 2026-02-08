@@ -7,16 +7,15 @@ import {
   useCurrentFrame,
   useVideoConfig,
   Sequence,
-  Easing,
-} from '@remotion/react';
+} from 'remotion';
 
 interface Caption {
   text: string;
-  startTime: number; // em segundos
-  duration: number; // em segundos
+  startTime: number;
+  duration: number;
 }
 
-interface RealEstateVideoProps {
+interface Props {
   images: string[];
   narrationAudioUrl?: string;
   musicUrl?: string;
@@ -24,7 +23,7 @@ interface RealEstateVideoProps {
   title?: string;
 }
 
-export const RealEstateVideo: React.FC<RealEstateVideoProps> = ({
+export const RealEstateVideo: React.FC<Props> = ({
   images,
   narrationAudioUrl,
   musicUrl,
@@ -32,217 +31,146 @@ export const RealEstateVideo: React.FC<RealEstateVideoProps> = ({
   title,
 }) => {
   const { fps, durationInFrames } = useVideoConfig();
-  const frame = useCurrentFrame();
-
-  // Duração de cada imagem (distribuí igualmente)
   const imageDuration = durationInFrames / images.length;
+
+  // DEBUG
+  console.log('🎬 RealEstateVideo props:', { 
+    title, 
+    captionsCount: captions.length,
+    captions: captions.slice(0, 2),
+    imagesCount: images.length 
+  });
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
-      {/* Áudio de narração */}
-      {narrationAudioUrl && (
-        <Audio src={narrationAudioUrl} volume={1} />
-      )}
+      {narrationAudioUrl && <Audio src={narrationAudioUrl} volume={1} />}
+      {musicUrl && <Audio src={musicUrl} volume={0.3} />}
 
-      {/* Música de fundo */}
-      {musicUrl && (
-        <Audio src={musicUrl} volume={0.3} />
-      )}
+      {/* Imagens */}
+      {images.map((url, i) => (
+        <Sequence
+          key={i}
+          from={Math.round(i * imageDuration)}
+          durationInFrames={Math.round(imageDuration)}
+        >
+          <Img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        </Sequence>
+      ))}
 
-      {/* Slides de imagens */}
-      {images.map((imageUrl, index) => {
-        const startFrame = index * imageDuration;
-        const endFrame = (index + 1) * imageDuration;
-
-        return (
-          <Sequence
-            key={index}
-            from={Math.round(startFrame)}
-            durationInFrames={Math.round(imageDuration)}
-          >
-            <ImageSlide
-              imageUrl={imageUrl}
-              index={index}
-              totalImages={images.length}
-            />
-          </Sequence>
-        );
-      })}
-
-      {/* Legendas/Captions */}
-      {captions.map((caption, index) => {
-        const startFrame = caption.startTime * fps;
-        const durationFrames = caption.duration * fps;
-
-        return (
-          <Sequence
-            key={`caption-${index}`}
-            from={Math.round(startFrame)}
-            durationInFrames={Math.round(durationFrames)}
-          >
-            <CaptionOverlay text={caption.text} />
-          </Sequence>
-        );
-      })}
-
-      {/* Título inicial */}
+      {/* TÍTULO - Apenas texto, sem fundo escuro */}
       {title && (
-        <Sequence from={0} durationInFrames={fps * 3}>
-          <TitleOverlay title={title} />
+        <Sequence from={0} durationInFrames={fps * 2}>
+          <TitleCard title={title} />
         </Sequence>
       )}
+
+      {/* LEGENDAS */}
+      {captions.map((cap, i) => {
+        const startFrame = Math.round(cap.startTime * fps);
+        const durationFrames = Math.round(cap.duration * fps);
+        
+        return (
+          <Sequence
+            key={`caption-${i}`}
+            from={startFrame}
+            durationInFrames={durationFrames}
+          >
+            <Caption text={cap.text} />
+          </Sequence>
+        );
+      })}
     </AbsoluteFill>
   );
 };
 
-// Componente de slide individual
-const ImageSlide: React.FC<{
-  imageUrl: string;
-  index: number;
-  totalImages: number;
-}> = ({ imageUrl, index, totalImages }) => {
+// Título com fade suave
+const TitleCard: React.FC<{ title: string }> = ({ title }) => {
   const frame = useCurrentFrame();
-  const { durationInFrames } = useVideoConfig();
+  const { fps } = useVideoConfig();
   
-  // Animação de zoom sutil (Ken Burns effect)
-  const zoomProgress = frame / durationInFrames;
-  const scale = interpolate(zoomProgress, [0, 1], [1, 1.1], {
-    easing: Easing.linear,
-  });
-
-  // Fade in/out
+  // Fade in/out suave
   const opacity = interpolate(
     frame,
-    [0, 10, durationInFrames - 10, durationInFrames],
+    [0, 15, fps * 1.5, fps * 2],
     [0, 1, 1, 0],
-    {
-      extrapolateLeft: 'clamp',
-      extrapolateRight: 'clamp',
-    }
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
   );
 
   return (
-    <AbsoluteFill
+    <div
       style={{
+        position: 'absolute',
+        top: '10%',
+        left: 0,
+        right: 0,
+        textAlign: 'center',
         opacity,
-        transform: `scale(${scale})`,
+        zIndex: 50,
       }}
     >
-      <Img
-        src={imageUrl}
+      <h1
         style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
+          color: 'white',
+          fontSize: 72,
+          fontWeight: 'bold',
+          textAlign: 'center',
+          padding: '20px 40px',
+          margin: 0,
+          textShadow: '0 4px 20px rgba(0,0,0,0.8)',
+          backgroundColor: 'rgba(0,0,0,0.4)',
+          display: 'inline-block',
+          borderRadius: 20,
         }}
-      />
-      
-      {/* Overlay gradiente para melhorar legibilidade de texto */}
-      <div
-        style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: '30%',
-          background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)',
-        }}
-      />
-    </AbsoluteFill>
+      >
+        {title}
+      </h1>
+    </div>
   );
 };
 
-// Componente de legenda
-const CaptionOverlay: React.FC<{ text: string }> = ({ text }) => {
+// Legenda estilizada
+const Caption: React.FC<{ text: string }> = ({ text }) => {
   const frame = useCurrentFrame();
-
-  // Animação de entrada
-  const translateY = interpolate(frame, [0, 15], [30, 0], {
-    extrapolateRight: 'clamp',
-    easing: Easing.out(Easing.quad),
-  });
-
-  const opacity = interpolate(frame, [0, 10], [0, 1], {
+  
+  const opacity = interpolate(frame, [0, 10, 50, 60], [0, 1, 1, 0], {
+    extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
 
   return (
-    <AbsoluteFill
+    <div
       style={{
-        justifyContent: 'flex-end',
-        alignItems: 'center',
-        paddingBottom: '15%',
+        position: 'absolute',
+        bottom: '15%',
+        left: 0,
+        right: 0,
+        textAlign: 'center',
+        opacity,
+        zIndex: 100,
       }}
     >
       <div
         style={{
-          transform: `translateY(${translateY}px)`,
-          opacity,
-          backgroundColor: 'rgba(0,0,0,0.7)',
-          padding: '20px 30px',
-          borderRadius: '12px',
-          backdropFilter: 'blur(8px)',
-          maxWidth: '85%',
+          display: 'inline-block',
+          backgroundColor: 'rgba(0,0,0,0.85)',
+          padding: '25px 45px',
+          borderRadius: 16,
+          border: '2px solid rgba(255,255,255,0.3)',
         }}
       >
         <p
           style={{
+            color: 'white',
+            fontSize: 44,
             margin: 0,
-            color: '#fff',
-            fontSize: '36px',
-            fontFamily: 'Inter, system-ui, sans-serif',
-            fontWeight: 500,
-            textAlign: 'center',
-            lineHeight: 1.4,
-            textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+            fontWeight: 'bold',
+            textShadow: '0 2px 4px rgba(0,0,0,0.5)',
           }}
         >
           {text}
         </p>
       </div>
-    </AbsoluteFill>
-  );
-};
-
-// Componente de título inicial
-const TitleOverlay: React.FC<{ title: string }> = ({ title }) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-
-  // Animação de fade in/out
-  const opacity = interpolate(
-    frame,
-    [0, 10, fps * 2, fps * 3],
-    [0, 1, 1, 0],
-    {
-      extrapolateLeft: 'clamp',
-      extrapolateRight: 'clamp',
-    }
-  );
-
-  return (
-    <AbsoluteFill
-      style={{
-        opacity,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: 'rgba(0,0,0,0.5)',
-      }}
-    >
-      <h1
-        style={{
-          color: '#fff',
-          fontSize: '64px',
-          fontFamily: 'Inter, system-ui, sans-serif',
-          fontWeight: 700,
-          textAlign: 'center',
-          padding: '0 40px',
-          textShadow: '0 4px 12px rgba(0,0,0,0.5)',
-        }}
-      >
-        {title}
-      </h1>
-    </AbsoluteFill>
+    </div>
   );
 };
 

@@ -44,13 +44,16 @@ export interface CaptionStyle {
   animation: 'fade' | 'slide' | 'typewriter';
 }
 
+export type TTSProviderType = 'openai' | 'elevenlabs' | 'huggingface' | 'replicate' | 'falai';
+
 export interface TTSVoice {
   id: string;
   name: string;
-  provider: 'openai' | 'elevenlabs' | 'azure';
+  provider: TTSProviderType;
   gender: 'male' | 'female';
   language: string;
   previewUrl?: string;
+  description?: string;
 }
 
 export interface GenerateVideoRequest {
@@ -77,7 +80,7 @@ export interface GenerateVideoResponse {
 export interface TTSPreviewRequest {
   text: string;
   voiceId: string;
-  provider: 'openai' | 'elevenlabs' | 'azure';
+  provider: TTSProviderType;
 }
 
 export interface TTSPreviewResponse {

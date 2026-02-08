@@ -109,12 +109,26 @@ function generateCaptionsFromText(
   text: string,
   images: Array<{ url: string; duration: number }>
 ): Array<{ text: string; startTime: number; endTime: number }> {
-  const sentences = text.split(/[.!?]+/).filter(Boolean);
+  // Regex que preserva a pontuação no final
+  const sentences = text
+    .replace(/([.!?]+)/g, "$1|")
+    .split("|")
+    .map(s => s.trim())
+    .filter(s => s.length > 0);
+  
   const totalDuration = images.reduce((acc, img) => acc + img.duration, 0);
   const durationPerSentence = totalDuration / Math.max(sentences.length, 1);
   
+  console.log('📝 Gerando captions:', {
+    textLength: text.length,
+    sentencesFound: sentences.length,
+    totalDuration,
+    durationPerSentence,
+    sentences: sentences.slice(0, 3),
+  });
+  
   let currentTime = 0;
-  return sentences.map((sentence, index) => {
+  const captions = sentences.map((sentence, index) => {
     const startTime = currentTime;
     const endTime = currentTime + durationPerSentence;
     currentTime = endTime;
@@ -125,6 +139,11 @@ function generateCaptionsFromText(
       endTime: Math.floor(endTime),
     };
   });
+
+  console.log('✅ Captions geradas:', captions.length, 'frases');
+  console.log('📋 Primeiras captions:', captions.slice(0, 3));
+  
+  return captions;
 }
 
 async function callRemotionRenderer(params: {
@@ -151,7 +170,7 @@ async function callRemotionRenderer(params: {
 
   console.log('Chamando render server com', params.images.length, 'imagens...');
 
-  const response = await fetch('http://localhost:3001/api/render', {
+  const response = await fetch('http://127.0.0.1:3002/api/render', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

@@ -43,10 +43,10 @@ interface RenderRequest {
 
 // Fallback FFmpeg (quando Remotion falhar)
 async function generateVideoWithFFmpeg(
-  jobId: string, 
-  images: Array<{ url: string; duration: number }>, 
-  captions: Array<{ text: string; startTime: number; endTime: number }>, 
-  musicPath: string
+  jobId: string,
+  images: Array<{ url: string; duration: number }>,
+  captions: Array<{ text: string; startTime: number; endTime: number }>,
+  musicPath?: string
 ): Promise<string> {
   const videoPath = path.join(outputDir, `${jobId}.mp4`);
   
@@ -74,7 +74,27 @@ async function generateVideoWithFFmpeg(
   images.forEach((img, i) => {
     inputArgs += ` -loop 1 -t ${img.duration / 1000} -i "${path.join(tempDir, `img_${jobId}_${i}.jpg`)}"`;
   });
-  inputArgs += ` -i "${musicPath}"`;
+
+  // Verificar se música existe
+  let hasAudio = false;
+  if (musicPath) {
+    try {
+      await readFile(musicPath);
+      inputArgs += ` -i "${musicPath}"`;
+      hasAudio = true;
+    } catch (e) {
+      console.log('⚠️ Arquivo de música não encontrado, gerando áudio mudo...');
+      // Criar áudio mudo
+      const silentPath = path.join(tempDir, `silent_${jobId}.mp3`);
+      try {
+        await execAsync(`ffmpeg -f lavfi -i "anullsrc=r=44100:cl=stereo" -t 1 -q:a 0 "${silentPath}"`);
+        inputArgs += ` -i "${silentPath}"`;
+        hasAudio = true;
+      } catch (e) {
+        console.error('❌ Erro ao criar áudio mudo:', e);
+      }
+    }
+  }
 
   let scaleFilters = '';
   for (let i = 0; i < images.length; i++) {
@@ -87,9 +107,11 @@ async function generateVideoWithFFmpeg(
   }
 
   const filterComplex = `${scaleFilters}${concatInputs}concat=n=${images.length}:v=1:a=0[outv]`;
-  const cmd = `ffmpeg -y${inputArgs} -filter_complex "${filterComplex}" -map "[outv]" -map ${images.length}:a -c:v libx264 -c:a aac -shortest -pix_fmt yuv420p -preset ultrafast "${videoPath}"`;
+  const audioMap = hasAudio ? `-map "[outv]" -map ${images.length}:a` : `-map "[outv]"`;
+  const cmd = `ffmpeg -y${inputArgs} -filter_complex "${filterComplex}" ${audioMap} -c:v libx264 -c:a aac -shortest -pix_fmt yuv420p -preset ultrafast "${videoPath}"`;
 
   console.log('Executando FFmpeg...');
+  console.log('Command:', cmd);
   await execAsync(cmd, { maxBuffer: 300 * 1024 * 1024, timeout: 300 });
   
   // Cleanup
@@ -138,20 +160,33 @@ async function generateVideoWithRemotion(
       });
     }
 
-    // Copiar música
-    const musicFilename = `job_${jobId}_music.mp3`;
-    const localMusicPath = path.join(tempDir, musicFilename);
-    const musicSourcePath = params.musicUrl.startsWith('/')
-      ? path.join(publicDir, params.musicUrl)
-      : null;
-      
-    if (musicSourcePath) {
-      const content = await readFile(musicSourcePath);
-      await writeFile(localMusicPath, content);
-    } else {
-      const response = await fetch(params.musicUrl);
-      const buffer = await response.arrayBuffer();
-      await writeFile(localMusicPath, Buffer.from(buffer));
+    // Copiar música (se existir)
+    let musicHttpUrl: string | undefined;
+    if (params.musicUrl) {
+      const musicFilename = `job_${jobId}_music.mp3`;
+      const localMusicPath = path.join(tempDir, musicFilename);
+      const musicSourcePath = params.musicUrl.startsWith('/')
+        ? path.join(publicDir, params.musicUrl)
+        : null;
+        
+      if (musicSourcePath) {
+        try {
+          const content = await readFile(musicSourcePath);
+          await writeFile(localMusicPath, content);
+          musicHttpUrl = `http://localhost:${PORT}/temp/${musicFilename}`;
+        } catch (e) {
+          console.log('⚠️ Arquivo de música não encontrado, continuando sem música...');
+        }
+      } else {
+        try {
+          const response = await fetch(params.musicUrl);
+          const buffer = await response.arrayBuffer();
+          await writeFile(localMusicPath, Buffer.from(buffer));
+          musicHttpUrl = `http://localhost:${PORT}/temp/${musicFilename}`;
+        } catch (e) {
+          console.log('⚠️ Falha ao baixar música, continuando sem música...');
+        }
+      }
     }
 
     // Bundle do projeto Remotion (apenas na primeira vez)
@@ -166,9 +201,6 @@ async function generateVideoWithRemotion(
     // Calcular duração total em frames
     const totalDurationMs = params.images.reduce((acc, img) => acc + img.duration, 0);
     const durationInFrames = Math.ceil((totalDurationMs / 1000) * 30);
-
-    // URLs HTTP para Remotion
-    const musicHttpUrl = `http://localhost:${PORT}/temp/${musicFilename}`;
 
     // Preparar props
     const inputProps = {
@@ -217,7 +249,9 @@ async function generateVideoWithRemotion(
     for (let i = 0; i < params.images.length; i++) {
       await unlink(path.join(tempDir, `job_${jobId}_img_${i}.jpg`)).catch(() => {});
     }
-    await unlink(localMusicPath).catch(() => {});
+    if (musicHttpUrl) {
+      await unlink(path.join(tempDir, `job_${jobId}_music.mp3`)).catch(() => {});
+    }
     
     return outputLocation;
     
@@ -226,14 +260,22 @@ async function generateVideoWithRemotion(
     console.log('⚠️ Tentando fallback com FFmpeg (sem legendas)...');
     
     // Fallback para FFmpeg
-    const musicPath = path.join(tempDir, `music_${jobId}.mp3`);
-    const musicSourcePath = params.musicUrl.startsWith('/')
-      ? path.join(publicDir, params.musicUrl)
-      : null;
-    
-    if (musicSourcePath) {
-      const content = await readFile(musicSourcePath);
-      await writeFile(musicPath, content);
+    let musicPath: string | undefined;
+    if (params.musicUrl) {
+      const musicFilePath = path.join(tempDir, `music_${jobId}.mp3`);
+      const musicSourcePath = params.musicUrl.startsWith('/')
+        ? path.join(publicDir, params.musicUrl)
+        : null;
+      
+      if (musicSourcePath) {
+        try {
+          const content = await readFile(musicSourcePath);
+          await writeFile(musicFilePath, content);
+          musicPath = musicFilePath;
+        } catch (e) {
+          console.log('⚠️ Arquivo de música não encontrado');
+        }
+      }
     }
     
     return generateVideoWithFFmpeg(jobId, params.images, params.captions, musicPath);

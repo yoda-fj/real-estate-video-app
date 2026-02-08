@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { ttsService, AVAILABLE_VOICES } from '../services/tts';
+import { ttsGateway } from '../tts/gateway';
 import { z } from 'zod';
 
 const router = Router();
@@ -8,7 +8,7 @@ const ttsSchema = z.object({
   text: z.string().min(1).max(4000),
   voice: z.string().optional(),
   speed: z.number().min(0.5).max(2.0).optional(),
-  provider: z.enum(['openai', 'elevenlabs']).optional(),
+  provider: z.enum(['openai', 'elevenlabs', 'huggingface', 'hf-local']).optional(),
 });
 
 /**
@@ -18,9 +18,14 @@ const ttsSchema = z.object({
 router.post('/generate', async (req, res) => {
   try {
     const validated = ttsSchema.parse(req.body);
-    
-    const result = await ttsService.generateAudio(validated);
-    
+
+    const result = await ttsGateway.generate({
+      text: validated.text,
+      voice: validated.voice || 'alloy',
+      speed: validated.speed,
+      provider: validated.provider || 'openai',
+    });
+
     res.json({
       success: true,
       data: result,
@@ -48,7 +53,9 @@ router.post('/generate', async (req, res) => {
  * Lista vozes disponíveis
  */
 router.get('/voices', (req, res) => {
-  const voices = ttsService.getAvailableVoices();
+  const provider = req.query.provider as string | undefined;
+  const voices = ttsGateway.getVoicesByProvider();
+
   res.json({
     success: true,
     data: voices,
@@ -62,8 +69,8 @@ router.get('/voices', (req, res) => {
 router.post('/estimate', (req, res) => {
   try {
     const { text } = z.object({ text: z.string() }).parse(req.body);
-    const duration = ttsService.estimateDuration(text);
-    
+    const duration = ttsGateway.estimateDuration(text);
+
     res.json({
       success: true,
       data: { duration, textLength: text.length },

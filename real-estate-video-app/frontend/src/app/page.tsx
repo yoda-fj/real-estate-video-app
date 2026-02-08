@@ -3,6 +3,11 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
 export default async function HomePage() {
+  // Dev mode - skip auth
+  if (process.env.SKIP_AUTH === 'true') {
+    redirect('/editor');
+  }
+
   const cookieStore = cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

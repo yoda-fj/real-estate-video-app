@@ -8,7 +8,7 @@ interface TTSOptions {
   text: string;
   voice?: string;
   speed?: number;
-  provider?: 'openai' | 'elevenlabs';
+  provider?: 'openai' | 'elevenlabs' | 'huggingface' | 'hf-local';
 }
 
 interface TTSResult {
@@ -20,7 +20,10 @@ interface TTSResult {
 interface Voice {
   id: string;
   name: string;
-  description: string;
+  provider: string;
+  description?: string;
+  language?: string;
+  gender?: 'male' | 'female';
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -81,9 +84,11 @@ export function useTTS() {
 
 // Hook para listar vozes disponíveis
 export function useAvailableVoices() {
-  const [voices, setVoices] = useState<{ openai: Voice[]; elevenlabs: Voice[] }>({
+  const [voices, setVoices] = useState<Record<string, Voice[]>>({
     openai: [],
     elevenlabs: [],
+    huggingface: [],
+    'hf-local': [],
   });
   const [isLoading, setIsLoading] = useState(false);
 

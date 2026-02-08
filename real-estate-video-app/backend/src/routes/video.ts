@@ -8,12 +8,10 @@ const renderSchema = z.object({
   projectId: z.string().uuid(),
   images: z.array(z.string().url()),
   narrationAudioUrl: z.string().url().optional(),
+  narrationText: z.string().optional(), // Texto para gerar legendas sincronizadas
   musicUrl: z.string().url().optional(),
-  captions: z.array(z.object({
-    text: z.string(),
-    startTime: z.number(),
-    duration: z.number(),
-  })).optional(),
+  title: z.string().optional(),
+  subtitle: z.string().optional(),
   quality: z.enum(['low', 'medium', 'high']).optional(),
 });
 
@@ -25,25 +23,37 @@ router.post('/render', async (req, res) => {
   try {
     const validated = renderSchema.parse(req.body);
     
-    // Se não tiver Remotion configurado, usa mock
-    const useMock = !process.env.REMOTION_ENTRY;
+    console.log('🎬 Requisição de renderização recebida:', {
+      projectId: validated.projectId,
+      imagesCount: validated.images.length,
+      hasNarration: !!validated.narrationAudioUrl,
+      hasMusic: !!validated.musicUrl,
+    });
+
+    // Se tiver narrationText, gera legendas sincronizadas
+    let captions;
+    if (validated.narrationText) {
+      captions = videoService.generateSyncCaptions(validated.narrationText);
+      console.log('📝 Legendas sincronizadas geradas:', captions.length, 'frases');
+    }
     
-    const jobId = useMock
-      ? await videoService.createMockVideo(validated.projectId)
-      : await videoService.startRender(validated.projectId, {
-          images: validated.images,
-          narrationAudioUrl: validated.narrationAudioUrl,
-          musicUrl: validated.musicUrl,
-          captions: validated.captions,
-          quality: validated.quality,
-        });
+    const jobId = await videoService.startRender(validated.projectId, {
+      images: validated.images,
+      narrationAudioUrl: validated.narrationAudioUrl,
+      musicUrl: validated.musicUrl,
+      title: validated.title,
+      subtitle: validated.subtitle,
+      quality: validated.quality,
+      captions: captions, // Passa as legendas sincronizadas
+    });
 
     res.json({
       success: true,
       data: {
         jobId,
         status: 'pending',
-        mode: useMock ? 'mock' : 'remotion',
+        mode: 'remotion',
+        captionsPreview: captions?.map(c => ({ text: c.text, start: c.startTime.toFixed(1) + 's' })),
       },
     });
   } catch (error: any) {
