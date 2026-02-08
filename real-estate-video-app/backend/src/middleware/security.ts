@@ -31,9 +31,23 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
  */
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 
+// Periodic cleanup of expired rate limit records (every 5 minutes)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of rateLimitStore.entries()) {
+    if (now > value.resetTime) {
+      rateLimitStore.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
+
 /**
  * Simple rate limiting middleware
  * Limits requests per IP address
+ * 
+ * Note: This implementation is suitable for single-instance deployments.
+ * For production with multiple instances, use Redis-based rate limiting
+ * (e.g., rate-limiter-flexible with Redis).
  */
 export function rateLimit(
   maxRequests: number = 100,
@@ -66,6 +80,7 @@ export function rateLimit(
       });
     }
     
+    // Atomic increment (safe in Node.js single-threaded event loop)
     record.count++;
     next();
   };

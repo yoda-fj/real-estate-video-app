@@ -17,6 +17,9 @@ import videoRoutes from './routes/video';
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Rate limiting configuration
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
 // Security headers
 app.use(securityHeaders);
 
@@ -44,10 +47,10 @@ app.get('/health', (req, res) => {
 });
 
 // API Routes with rate limiting
-app.use('/api/script', rateLimit(50, 15 * 60 * 1000), scriptRoutes);
-app.use('/api/tts', rateLimit(30, 15 * 60 * 1000), ttsRoutes);
-app.use('/api/upload', rateLimit(20, 15 * 60 * 1000), uploadRoutes);
-app.use('/api/video', rateLimit(10, 15 * 60 * 1000), videoRoutes);
+app.use('/api/script', rateLimit(50, RATE_LIMIT_WINDOW_MS), scriptRoutes);
+app.use('/api/tts', rateLimit(30, RATE_LIMIT_WINDOW_MS), ttsRoutes);
+app.use('/api/upload', rateLimit(20, RATE_LIMIT_WINDOW_MS), uploadRoutes);
+app.use('/api/video', rateLimit(10, RATE_LIMIT_WINDOW_MS), videoRoutes);
 
 // Error handling
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
