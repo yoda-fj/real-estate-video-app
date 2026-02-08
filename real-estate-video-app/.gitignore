@@ -41,5 +41,22 @@ next-env.d.ts
 *.swp
 *.swo
 
-frontend/public
+# Uploads and Generated Content
+uploads/
+renders/
+audio/
+backend/uploads/
+backend/renders/
+backend/audio/
+frontend/public/uploads
+frontend/public/renders
 frontend/temp
+
+# OS Files
+.DS_Store
+**/.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/

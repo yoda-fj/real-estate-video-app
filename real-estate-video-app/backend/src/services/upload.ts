@@ -6,6 +6,7 @@
 import { createClient } from '@supabase/supabase-js';
 import * as fs from 'fs';
 import * as path from 'path';
+import { validateFileContent, sanitizeFilename } from '../middleware/security';
 
 export interface UploadResult {
   url: string;
@@ -44,9 +45,14 @@ export class UploadService {
   async uploadImage(options: ImageUploadOptions): Promise<UploadResult> {
     const { file, filename, contentType, userId, projectId } = options;
 
+    // Validate file content (check magic numbers)
+    if (!validateFileContent(file, contentType)) {
+      throw new Error('Invalid file content. File does not match declared MIME type.');
+    }
+
     // Gera path único
     const timestamp = Date.now();
-    const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const sanitizedFilename = sanitizeFilename(filename);
     const storagePath = projectId
       ? `${userId}/${projectId}/${timestamp}_${sanitizedFilename}`
       : `${userId}/${timestamp}_${sanitizedFilename}`;
